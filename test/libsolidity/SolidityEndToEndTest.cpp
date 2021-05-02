@@ -2345,6 +2345,24 @@ BOOST_AUTO_TEST_CASE(constructor_static_array_argument)
 	ABI_CHECK(callContractFunction("b(uint256)", u256(2)), encodeArgs(u256(4)));
 }
 
+BOOST_AUTO_TEST_CASE(constant_var_as_array_length)
+{
+	char const* sourceCode = R"(
+		contract C {
+			uint constant LEN = 3;
+			uint[LEN] public a;
+
+			function C(uint[LEN] _a) {
+				a = _a;
+			}
+		}
+	)";
+	compileAndRun(sourceCode, 0, "C", encodeArgs(u256(1), u256(2), u256(3)));
+	ABI_CHECK(callContractFunction("a(uint256)", u256(0)), encodeArgs(u256(1)));
+	ABI_CHECK(callContractFunction("a(uint256)", u256(1)), encodeArgs(u256(2)));
+	ABI_CHECK(callContractFunction("a(uint256)", u256(2)), encodeArgs(u256(3)));
+}
+
 BOOST_AUTO_TEST_CASE(functions_called_by_constructor)
 {
 	char const* sourceCode = R"(
@@ -2953,7 +2971,7 @@ BOOST_AUTO_TEST_CASE(event_no_arguments)
 {
 	char const* sourceCode = R"(
 		contract ClientReceipt {
-			event Deposit;
+			event Deposit();
 			function deposit() {
 				Deposit();
 			}
@@ -2995,7 +3013,7 @@ BOOST_AUTO_TEST_CASE(events_with_same_name)
 {
 	char const* sourceCode = R"(
 		contract ClientReceipt {
-			event Deposit;
+			event Deposit();
 			event Deposit(address _addr);
 			event Deposit(address _addr, uint _amount);
 			function deposit() returns (uint) {
@@ -3041,7 +3059,7 @@ BOOST_AUTO_TEST_CASE(events_with_same_name_inherited)
 {
 	char const* sourceCode = R"(
 		contract A {
-			event Deposit;
+			event Deposit();
 		}
 
 		contract B {
@@ -3559,6 +3577,39 @@ BOOST_AUTO_TEST_CASE(library_call_in_homestead)
 	compileAndRun(sourceCode, 0, "Test", bytes(), map<string, Address>{{"Lib", m_contractAddress}});
 	ABI_CHECK(callContractFunction("f()"), encodeArgs());
 	ABI_CHECK(callContractFunction("sender()"), encodeArgs(u160(m_sender)));
+}
+
+BOOST_AUTO_TEST_CASE(library_call_protection)
+{
+	// This tests code that reverts a call if it is a direct call to a library
+	// as opposed to a delegatecall.
+	char const* sourceCode = R"(
+		library Lib {
+			struct S { uint x; }
+			// a direct call to this should revert
+			function np(S storage s) public returns (address) { s.x = 3; return msg.sender; }
+			// a direct call to this is fine
+			function v(S storage) public view returns (address) { return msg.sender; }
+			// a direct call to this is fine
+			function pu() public pure returns (uint) { return 2; }
+		}
+		contract Test {
+			Lib.S public s;
+			function np() public returns (address) { return Lib.np(s); }
+			function v() public view returns (address) { return Lib.v(s); }
+			function pu() public pure returns (uint) { return Lib.pu(); }
+		}
+	)";
+	compileAndRun(sourceCode, 0, "Lib");
+	ABI_CHECK(callContractFunction("np(Lib.S storage)"), encodeArgs());
+	ABI_CHECK(callContractFunction("v(Lib.S storage)"), encodeArgs(u160(m_sender)));
+	ABI_CHECK(callContractFunction("pu()"), encodeArgs(2));
+	compileAndRun(sourceCode, 0, "Test", bytes(), map<string, Address>{{"Lib", m_contractAddress}});
+	ABI_CHECK(callContractFunction("s()"), encodeArgs(0));
+	ABI_CHECK(callContractFunction("np()"), encodeArgs(u160(m_sender)));
+	ABI_CHECK(callContractFunction("s()"), encodeArgs(3));
+	ABI_CHECK(callContractFunction("v()"), encodeArgs(u160(m_sender)));
+	ABI_CHECK(callContractFunction("pu()"), encodeArgs(2));
 }
 
 BOOST_AUTO_TEST_CASE(store_bytes)
@@ -8048,6 +8099,24 @@ BOOST_AUTO_TEST_CASE(inline_assembly_embedded_function_call)
 	)";
 	compileAndRun(sourceCode, 0, "C");
 	ABI_CHECK(callContractFunction("f()"), encodeArgs(u256(1), u256(4), u256(7), u256(0x10)));
+}
+
+BOOST_AUTO_TEST_CASE(inline_assembly_if)
+{
+	char const* sourceCode = R"(
+		contract C {
+			function f(uint a) returns (uint b) {
+				assembly {
+					if gt(a, 1) { b := 2 }
+				}
+			}
+		}
+	)";
+	compileAndRun(sourceCode, 0, "C");
+	ABI_CHECK(callContractFunction("f(uint256)", u256(0)), encodeArgs(u256(0)));
+	ABI_CHECK(callContractFunction("f(uint256)", u256(1)), encodeArgs(u256(0)));
+	ABI_CHECK(callContractFunction("f(uint256)", u256(2)), encodeArgs(u256(2)));
+	ABI_CHECK(callContractFunction("f(uint256)", u256(3)), encodeArgs(u256(2)));
 }
 
 BOOST_AUTO_TEST_CASE(inline_assembly_switch)

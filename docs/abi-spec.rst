@@ -40,21 +40,21 @@ The following elementary types exist:
 
 - ``int<M>``: two's complement signed integer type of ``M`` bits, ``0 < M <= 256``, ``M % 8 == 0``.
 
-- ``address``: equivalent to ``uint160``, except for the assumed interpretation and language typing.
+- ``address``: equivalent to ``uint160``, except for the assumed interpretation and language typing. For computing the function selector, ``address`` is used.
 
-- ``uint``, ``int``: synonyms for ``uint256``, ``int256`` respectively (this shorthand not to be used for computing the function selector).
+- ``uint``, ``int``: synonyms for ``uint256``, ``int256`` respectively. For computing the function selector, ``uint256`` and ``int256`` have to be used.
 
-- ``bool``: equivalent to ``uint8`` restricted to the values 0 and 1
+- ``bool``: equivalent to ``uint8`` restricted to the values 0 and 1. For computing the function selector, ``bool`` is used.
 
 - ``fixed<M>x<N>``: signed fixed-point decimal number of ``M`` bits, ``8 <= M <= 256``, ``M % 8 ==0``, and ``0 < N <= 80``, which denotes the value ``v`` as ``v / (10 ** N)``.
 
 - ``ufixed<M>x<N>``: unsigned variant of ``fixed<M>x<N>``.
 
-- ``fixed``, ``ufixed``: synonyms for ``fixed128x19``, ``ufixed128x19`` respectively (this shorthand not to be used for computing the function selector).
+- ``fixed``, ``ufixed``: synonyms for ``fixed128x19``, ``ufixed128x19`` respectively. For computing the function selector, ``fixed128x19`` and ``ufixed128x19`` have to be used.
 
 - ``bytes<M>``: binary type of ``M`` bytes, ``0 < M <= 32``.
 
-- ``function``: equivalent to ``bytes24``: an address, followed by a function selector
+- ``function``: an address (20 bytes) folled by a function selector (4 bytes). Encoded identical to ``bytes24``.
 
 The following (fixed-size) array type exists:
 
@@ -130,14 +130,14 @@ on the type of ``X`` being
   Note that in the dynamic case, ``head(X(i))`` is well-defined since the lengths of
   the head parts only depend on the types and not the values. Its value is the offset
   of the beginning of ``tail(X(i))`` relative to the start of ``enc(X)``.
-  
+
 - ``T[k]`` for any ``T`` and ``k``:
 
   ``enc(X) = enc((X[0], ..., X[k-1]))``
-  
+
   i.e. it is encoded as if it were a tuple with ``k`` elements
   of the same type.
-  
+
 - ``T[]`` where ``X`` has ``k`` elements (``k`` is assumed to be of type ``uint256``):
 
   ``enc(X) = enc(k) enc([X[1], ..., X[k]])``
@@ -187,12 +187,12 @@ Given the contract:
 
 ::
 
-    pragma solidity ^0.4.0;
+    pragma solidity ^0.4.16;
 
     contract Foo {
-      function bar(bytes3[2] xy) {}
-      function baz(uint32 x, bool y) returns (bool r) { r = x > 32 || y; }
-      function sam(bytes name, bool z, uint[] data) {}
+      function bar(bytes3[2]) public pure {}
+      function baz(uint32 x, bool y) public pure returns (bool r) { r = x > 32 || y; }
+      function sam(bytes, bool, uint[]) public pure {}
     }
 
 
@@ -288,6 +288,8 @@ In effect, a log entry using this ABI is described as:
 - ``topics[n]``: ``EVENT_INDEXED_ARGS[n - 1]`` (``EVENT_INDEXED_ARGS`` is the series of ``EVENT_ARGS`` that are indexed);
 - ``data``: ``abi_serialise(EVENT_NON_INDEXED_ARGS)`` (``EVENT_NON_INDEXED_ARGS`` is the series of ``EVENT_ARGS`` that are not indexed, ``abi_serialise`` is the ABI serialisation function used for returning a series of typed values from a function, as described above).
 
+For all fixed-length Solidity types, the ``EVENT_INDEXED_ARGS`` array contains the 32-byte encoded value directly. However, for *types of dynamic length*, which include ``string``, ``bytes``, and arrays, ``EVENT_INDEXED_ARGS`` will contain the *Keccak hash* of the encoded value, rather than the encoded value directly. This allows applications to efficiently query for values of dynamic-length types (by setting the hash of the encoded value as the topic), but leaves applications unable to decode indexed values they have not queried for. For dynamic-length types, application developers face a trade-off between fast search for predetermined values (if the argument is indexed) and legibility of arbitrary values (which requires that the arguments not be indexed). Developers may overcome this tradeoff and achieve both efficient search and arbitrary legibility by defining events with two arguments — one indexed, one not — intended to hold the same value.
+
 JSON
 ====
 
@@ -326,19 +328,19 @@ An event description is a JSON object with fairly similar fields:
 
 - ``anonymous``: ``true`` if the event was declared as ``anonymous``.
 
-For example, 
+For example,
 
 ::
 
-  pragma solidity ^0.4.0;
+    pragma solidity ^0.4.0;
 
-  contract Test {
-    function Test(){ b = 0x12345678901234567890123456789012; }
-    event Event(uint indexed a, bytes32 b)
-    event Event2(uint indexed a, bytes32 b)
-    function foo(uint a) { Event(a, b); }
-    bytes32 b;
-  }
+    contract Test {
+      function Test() public { b = 0x12345678901234567890123456789012; }
+      event Event(uint indexed a, bytes32 b);
+      event Event2(uint indexed a, bytes32 b);
+      function foo(uint a) public { Event(a, b); }
+      bytes32 b;
+    }
 
 would result in the JSON:
 
@@ -377,11 +379,15 @@ As an example, the code
 
 ::
 
-  contract Test {
-    struct S { uint a; uint[] b; T[] c; }
-    struct T { uint x; uint y; }
-    function f(S s, T t, uint a) { }
-  }
+    pragma solidity ^0.4.19;
+    pragma experimental ABIEncoderV2;
+
+    contract Test {
+      struct S { uint a; uint[] b; T[] c; }
+      struct T { uint x; uint y; }
+      function f(S s, T t, uint a) public { }
+      function g() public returns (S s, T t, uint a) {}
+    }
 
 would result in the JSON:
 
@@ -451,13 +457,18 @@ Non-standard Packed Mode
 Solidity supports a non-standard packed mode where:
 
 - no :ref:`function selector <abi_function_selector>` is encoded,
-- short types are not zero padded and
+- types shorter than 32 bytes are neither zero padded nor sign extended and
 - dynamic types are encoded in-place and without the length.
 
-As an example encoding ``uint1, bytes1, uint8, string`` with values ``1, 0x42, 0x2424, "Hello, world!"`` results in ::
+As an example encoding ``int1, bytes1, uint16, string`` with values ``-1, 0x42, 0x2424, "Hello, world!"`` results in ::
 
-    0x0142242448656c6c6f2c20776f726c6421
-      ^^                                 uint1(1)
+    0xff42242448656c6c6f2c20776f726c6421
+      ^^                                 int1(-1)
         ^^                               bytes1(0x42)
-          ^^^^                           uint8(0x2424)
+          ^^^^                           uint16(0x2424)
               ^^^^^^^^^^^^^^^^^^^^^^^^^^ string("Hello, world!") without a length field
+
+More specifically, each statically-sized type takes as many bytes as its range has
+and dynamically-sized types like ``string``, ``bytes`` or ``uint[]`` are encoded without
+their length field. This means that the encoding is ambiguous as soon as there are two
+dynamically-sized elements.

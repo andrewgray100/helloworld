@@ -36,7 +36,7 @@ of votes.
 
 ::
 
-    pragma solidity ^0.4.11;
+    pragma solidity ^0.4.16;
 
     /// @title Voting with delegation.
     contract Ballot {
@@ -66,7 +66,7 @@ of votes.
         Proposal[] public proposals;
 
         /// Create a new ballot to choose one of `proposalNames`.
-        function Ballot(bytes32[] proposalNames) {
+        function Ballot(bytes32[] proposalNames) public {
             chairperson = msg.sender;
             voters[chairperson].weight = 1;
 
@@ -86,7 +86,7 @@ of votes.
 
         // Give `voter` the right to vote on this ballot.
         // May only be called by `chairperson`.
-        function giveRightToVote(address voter) {
+        function giveRightToVote(address voter) public {
             // If the argument of `require` evaluates to `false`,
             // it terminates and reverts all changes to
             // the state and to Ether balances. It is often
@@ -99,7 +99,7 @@ of votes.
         }
 
         /// Delegate your vote to the voter `to`.
-        function delegate(address to) {
+        function delegate(address to) public {
             // assigns reference
             Voter storage sender = voters[msg.sender];
             require(!sender.voted);
@@ -140,7 +140,7 @@ of votes.
 
         /// Give your vote (including votes delegated to you)
         /// to proposal `proposals[proposal].name`.
-        function vote(uint proposal) {
+        function vote(uint proposal) public {
             Voter storage sender = voters[msg.sender];
             require(!sender.voted);
             sender.voted = true;
@@ -154,7 +154,7 @@ of votes.
 
         /// @dev Computes the winning proposal taking all
         /// previous votes into account.
-        function winningProposal() constant
+        function winningProposal() public view
                 returns (uint winningProposal)
         {
             uint winningVoteCount = 0;
@@ -169,7 +169,7 @@ of votes.
         // Calls winningProposal() function to get the index
         // of the winner contained in the proposals array and then
         // returns the name of the winner
-        function winnerName() constant
+        function winnerName() public view
                 returns (bytes32 winnerName)
         {
             winnerName = proposals[winningProposal()].name;
@@ -221,8 +221,7 @@ activate themselves.
         // absolute unix timestamps (seconds since 1970-01-01)
         // or time periods in seconds.
         address public beneficiary;
-        uint public auctionStart;
-        uint public biddingTime;
+        uint public auctionEnd;
 
         // Current state of the auction.
         address public highestBidder;
@@ -249,17 +248,16 @@ activate themselves.
         function SimpleAuction(
             uint _biddingTime,
             address _beneficiary
-        ) {
+        ) public {
             beneficiary = _beneficiary;
-            auctionStart = now;
-            biddingTime = _biddingTime;
+            auctionEnd = now + _biddingTime;
         }
 
         /// Bid on the auction with the value sent
         /// together with this transaction.
         /// The value will only be refunded if the
         /// auction is not won.
-        function bid() payable {
+        function bid() public payable {
             // No arguments are necessary, all
             // information is already part of
             // the transaction. The keyword payable
@@ -268,7 +266,7 @@ activate themselves.
 
             // Revert the call if the bidding
             // period is over.
-            require(now <= (auctionStart + biddingTime));
+            require(now <= auctionEnd);
 
             // If the bid is not higher, send the
             // money back.
@@ -288,7 +286,7 @@ activate themselves.
         }
 
         /// Withdraw a bid that was overbid.
-        function withdraw() returns (bool) {
+        function withdraw() public returns (bool) {
             uint amount = pendingReturns[msg.sender];
             if (amount > 0) {
                 // It is important to set this to zero because the recipient
@@ -307,7 +305,7 @@ activate themselves.
 
         /// End the auction and send the highest bid
         /// to the beneficiary.
-        function auctionEnd() {
+        function auctionEnd() public {
             // It is a good guideline to structure functions that interact
             // with other contracts (i.e. they call functions or send Ether)
             // into three phases:
@@ -322,7 +320,7 @@ activate themselves.
             // external contracts.
 
             // 1. Conditions
-            require(now >= (auctionStart + biddingTime)); // auction did not yet end
+            require(now >= auctionEnd); // auction did not yet end
             require(!ended); // this function has already been called
 
             // 2. Effects
@@ -382,7 +380,6 @@ high or low invalid bids.
         }
 
         address public beneficiary;
-        uint public auctionStart;
         uint public biddingEnd;
         uint public revealEnd;
         bool public ended;
@@ -408,9 +405,8 @@ high or low invalid bids.
             uint _biddingTime,
             uint _revealTime,
             address _beneficiary
-        ) {
+        ) public {
             beneficiary = _beneficiary;
-            auctionStart = now;
             biddingEnd = now + _biddingTime;
             revealEnd = biddingEnd + _revealTime;
         }
@@ -425,6 +421,7 @@ high or low invalid bids.
         /// still make the required deposit. The same address can
         /// place multiple bids.
         function bid(bytes32 _blindedBid)
+            public
             payable
             onlyBefore(biddingEnd)
         {
@@ -442,6 +439,7 @@ high or low invalid bids.
             bool[] _fake,
             bytes32[] _secret
         )
+            public
             onlyAfter(biddingEnd)
             onlyBefore(revealEnd)
         {
@@ -491,12 +489,12 @@ high or low invalid bids.
         }
 
         /// Withdraw a bid that was overbid.
-        function withdraw() {
+        function withdraw() public {
             uint amount = pendingReturns[msg.sender];
             if (amount > 0) {
                 // It is important to set this to zero because the recipient
                 // can call this function again as part of the receiving call
-                // before `send` returns (see the remark above about
+                // before `transfer` returns (see the remark above about
                 // conditions -> effects -> interaction).
                 pendingReturns[msg.sender] = 0;
 
@@ -507,16 +505,16 @@ high or low invalid bids.
         /// End the auction and send the highest bid
         /// to the beneficiary.
         function auctionEnd()
+            public
             onlyAfter(revealEnd)
         {
             require(!ended);
             AuctionEnded(highestBidder, highestBid);
             ended = true;
-            // We send all the money we have, because some
-            // of the refunds might have failed.
-            beneficiary.transfer(this.balance);
+            beneficiary.transfer(highestBid);
         }
     }
+
 
 .. index:: purchase, remote purchase, escrow
 
@@ -538,7 +536,7 @@ Safe Remote Purchase
         // Ensure that `msg.value` is an even number.
         // Division will truncate if it is an odd number.
         // Check via multiplication that it wasn't an odd number.
-        function Purchase() payable {
+        function Purchase() public payable {
             seller = msg.sender;
             value = msg.value / 2;
             require((2 * value) == msg.value);
@@ -572,6 +570,7 @@ Safe Remote Purchase
         /// Can only be called by the seller before
         /// the contract is locked.
         function abort()
+            public
             onlySeller
             inState(State.Created)
         {
@@ -585,6 +584,7 @@ Safe Remote Purchase
         /// The ether will be locked until confirmReceived
         /// is called.
         function confirmPurchase()
+            public
             inState(State.Created)
             condition(msg.value == (2 * value))
             payable
@@ -597,6 +597,7 @@ Safe Remote Purchase
         /// Confirm that you (the buyer) received the item.
         /// This will release the locked ether.
         function confirmReceived()
+            public
             onlyBuyer
             inState(State.Locked)
         {

@@ -122,6 +122,20 @@ BOOST_AUTO_TEST_CASE(undeclared_name)
 	CHECK_ERROR(text, DeclarationError, "Undeclared identifier.");
 }
 
+BOOST_AUTO_TEST_CASE(undeclared_name_is_not_fatal)
+{
+	char const* text = R"(
+		contract test {
+			uint256 variable;
+			function f(uint256 arg) public {
+				f(notfound);
+				f(notfound);
+			}
+		}
+	)";
+	CHECK_ERROR_ALLOW_MULTI(text, DeclarationError, "Undeclared identifier.");
+}
+
 BOOST_AUTO_TEST_CASE(reference_to_later_declaration)
 {
 	char const* text = R"(
@@ -602,6 +616,7 @@ BOOST_AUTO_TEST_CASE(enum_external_type)
 BOOST_AUTO_TEST_CASE(external_structs)
 {
 	char const* text = R"(
+		pragma experimental ABIEncoderV2;
 		contract Test {
 			enum ActionChoices { GoLeft, GoRight, GoStraight, Sit }
 			struct Empty {}
@@ -629,6 +644,7 @@ BOOST_AUTO_TEST_CASE(external_structs)
 BOOST_AUTO_TEST_CASE(external_structs_in_libraries)
 {
 	char const* text = R"(
+		pragma experimental ABIEncoderV2;
 		library Test {
 			enum ActionChoices { GoLeft, GoRight, GoStraight, Sit }
 			struct Empty {}
@@ -1038,7 +1054,7 @@ BOOST_AUTO_TEST_CASE(function_modifier_double_invocation)
 			modifier mod(uint a) { if (a > 0) _; }
 		}
 	)";
-	success(text);
+	CHECK_SUCCESS(text);
 }
 
 BOOST_AUTO_TEST_CASE(base_constructor_double_invocation)
@@ -1392,7 +1408,7 @@ BOOST_AUTO_TEST_CASE(events_with_same_name)
 			event A(uint i);
 		}
 	)";
-	BOOST_CHECK(success(text));
+	CHECK_SUCCESS(text);
 }
 
 BOOST_AUTO_TEST_CASE(events_with_same_name_unnamed_arguments)
@@ -2107,7 +2123,7 @@ BOOST_AUTO_TEST_CASE(array_with_nonconstant_length)
 			function f(uint a) public { uint8[a] x; }
 		}
 	)";
-	CHECK_ERROR(text, TypeError, "Invalid array length, expected integer literal.");
+	CHECK_ERROR(text, TypeError, "Invalid array length, expected integer literal or constant expression.");
 }
 
 BOOST_AUTO_TEST_CASE(array_with_negative_length)
@@ -2178,6 +2194,16 @@ BOOST_AUTO_TEST_CASE(array_copy_with_different_types_dynamic_static)
 		}
 	)";
 	CHECK_ERROR(text, TypeError, "Type uint256[] storage ref is not implicitly convertible to expected type uint256[80] storage ref.");
+}
+
+BOOST_AUTO_TEST_CASE(array_of_undeclared_type)
+{
+	char const* text = R"(
+		contract c {
+			a[] public foo;
+		}
+	)";
+	CHECK_ERROR(text, DeclarationError, "Identifier not found or not unique.");
 }
 
 BOOST_AUTO_TEST_CASE(storage_variable_initialization_with_incorrect_type_int)
@@ -3511,6 +3537,7 @@ BOOST_AUTO_TEST_CASE(using_for_not_used)
 BOOST_AUTO_TEST_CASE(library_memory_struct)
 {
 	char const* text = R"(
+		pragma experimental ABIEncoderV2;
 		library c {
 			struct S { uint x; }
 			function f() public returns (S ) {}
@@ -3603,6 +3630,20 @@ BOOST_AUTO_TEST_CASE(invalid_args_creating_memory_array)
 		}
 	)";
 	CHECK_ERROR(text, TypeError, "Wrong argument count for function call: 0 arguments given but expected 1.");
+}
+
+BOOST_AUTO_TEST_CASE(invalid_args_creating_struct)
+{
+	char const* text = R"(
+		contract C {
+			struct S { uint a; uint b; }
+
+			function f() public {
+				var s = S({a: 1});
+			}
+		}
+	)";
+	CHECK_ERROR(text, TypeError, "Wrong argument count for struct constructor: 1 arguments given but expected 2.");
 }
 
 BOOST_AUTO_TEST_CASE(function_overload_array_type)
@@ -4033,7 +4074,51 @@ BOOST_AUTO_TEST_CASE(varM_disqualified_as_keyword)
 			}
 		}
 	)";
-	BOOST_CHECK(!success(text));
+	CHECK_ERROR_ALLOW_MULTI(text, DeclarationError, "Identifier not found or not unique.");
+}
+
+BOOST_AUTO_TEST_CASE(modifier_is_not_a_valid_typename)
+{
+	char const* text = R"(
+		contract test {
+			modifier mod() { _; }
+
+			function f() public {
+				mod g;
+			}
+		}
+	)";
+	CHECK_ERROR(text, TypeError, "Name has to refer to a struct, enum or contract.");
+}
+
+BOOST_AUTO_TEST_CASE(modifier_is_not_a_valid_typename_is_not_fatal)
+{
+	char const* text = R"(
+		contract test {
+			modifier mod() { _; }
+
+			function f() public {
+				mod g;
+				g = f;
+			}
+		}
+	)";
+	CHECK_ERROR_ALLOW_MULTI(text, TypeError, "Name has to refer to a struct, enum or contract.");
+}
+
+BOOST_AUTO_TEST_CASE(function_is_not_a_valid_typename)
+{
+	char const* text = R"(
+		contract test {
+			function foo() public {
+			}
+
+			function f() public {
+				foo g;
+			}
+		}
+	)";
+	CHECK_ERROR(text, TypeError, "Name has to refer to a struct, enum or contract.");
 }
 
 BOOST_AUTO_TEST_CASE(long_uint_variable_fails)
@@ -4045,7 +4130,7 @@ BOOST_AUTO_TEST_CASE(long_uint_variable_fails)
 			}
 		}
 	)";
-	BOOST_CHECK(!success(text));
+	CHECK_ERROR(text, DeclarationError, "Identifier not found or not unique.");
 }
 
 BOOST_AUTO_TEST_CASE(bytes10abc_is_identifier)
@@ -4084,7 +4169,7 @@ BOOST_AUTO_TEST_CASE(library_functions_do_not_have_value)
 			}
 		}
 	)";
-	BOOST_CHECK(!success(text));
+	CHECK_ERROR(text, TypeError, "Member \"value\" not found or not visible after argument-dependent lookup in function ()");
 }
 
 BOOST_AUTO_TEST_CASE(invalid_fixed_types_0x7_mxn)
@@ -4366,7 +4451,7 @@ BOOST_AUTO_TEST_CASE(invalid_array_declaration_with_signed_fixed_type)
 			}
 		}
 	)";
-	CHECK_ERROR(text, TypeError, "Invalid array length, expected integer literal.");
+	CHECK_ERROR(text, TypeError, "Invalid array length, expected integer literal or constant expression.");
 }
 
 BOOST_AUTO_TEST_CASE(invalid_array_declaration_with_unsigned_fixed_type)
@@ -4378,7 +4463,7 @@ BOOST_AUTO_TEST_CASE(invalid_array_declaration_with_unsigned_fixed_type)
 			}
 		}
 	)";
-	CHECK_ERROR(text, TypeError, "Invalid array length, expected integer literal.");
+	CHECK_ERROR(text, TypeError, "Invalid array length, expected integer literal or constant expression.");
 }
 
 BOOST_AUTO_TEST_CASE(rational_to_bytes_implicit_conversion)
@@ -4783,6 +4868,16 @@ BOOST_AUTO_TEST_CASE(warn_about_callcode)
 		}
 	)";
 	CHECK_WARNING(text, "\"callcode\" has been deprecated in favour of \"delegatecall\"");
+	text = R"(
+		pragma experimental "v0.5.0";
+		contract test {
+			function f() pure public {
+				var x = address(0x12).callcode;
+				x;
+			}
+		}
+	)";
+	CHECK_ERROR(text, TypeError, "\"callcode\" has been deprecated in favour of \"delegatecall\"");
 }
 
 BOOST_AUTO_TEST_CASE(no_warn_about_callcode_as_function)
@@ -5074,6 +5169,20 @@ BOOST_AUTO_TEST_CASE(payable_internal_function_type)
 		}
 	)";
 	CHECK_ERROR(text, TypeError, "Only external function types can be payable.");
+}
+
+BOOST_AUTO_TEST_CASE(payable_internal_function_type_is_not_fatal)
+{
+	char const* text = R"(
+		contract C {
+			function (uint) internal payable returns (uint) x;
+
+			function g() {
+				x = g;
+			}
+		}
+	)";
+	CHECK_ERROR_ALLOW_MULTI(text, TypeError, "Only external function types can be payable.");
 }
 
 BOOST_AUTO_TEST_CASE(call_value_on_non_payable_function_type)
@@ -5651,12 +5760,13 @@ BOOST_AUTO_TEST_CASE(constructible_internal_constructor)
 			function D() public { }
 		}
 	)";
-	success(text);
+	CHECK_SUCCESS(text);
 }
 
 BOOST_AUTO_TEST_CASE(return_structs)
 {
 	char const* text = R"(
+		pragma experimental ABIEncoderV2;
 		contract C {
 			struct S { uint a; T[] sub; }
 			struct T { uint[] x; }
@@ -5664,7 +5774,7 @@ BOOST_AUTO_TEST_CASE(return_structs)
 			}
 		}
 	)";
-	success(text);
+	CHECK_SUCCESS(text);
 }
 
 BOOST_AUTO_TEST_CASE(return_recursive_structs)
@@ -5714,7 +5824,7 @@ BOOST_AUTO_TEST_CASE(address_checksum_type_deduction)
 			}
 		}
 	)";
-	success(text);
+	CHECK_SUCCESS(text);
 }
 
 BOOST_AUTO_TEST_CASE(invalid_address_checksum)
@@ -5727,7 +5837,7 @@ BOOST_AUTO_TEST_CASE(invalid_address_checksum)
 			}
 		}
 	)";
-	CHECK_WARNING(text, "checksum");
+	CHECK_WARNING(text, "This looks like an address but has an invalid checksum.");
 }
 
 BOOST_AUTO_TEST_CASE(invalid_address_no_checksum)
@@ -5740,10 +5850,10 @@ BOOST_AUTO_TEST_CASE(invalid_address_no_checksum)
 			}
 		}
 	)";
-	CHECK_WARNING(text, "checksum");
+	CHECK_WARNING(text, "This looks like an address but has an invalid checksum.");
 }
 
-BOOST_AUTO_TEST_CASE(invalid_address_length)
+BOOST_AUTO_TEST_CASE(invalid_address_length_short)
 {
 	char const* text = R"(
 		contract C {
@@ -5753,7 +5863,20 @@ BOOST_AUTO_TEST_CASE(invalid_address_length)
 			}
 		}
 	)";
-	CHECK_WARNING(text, "checksum");
+	CHECK_WARNING(text, "This looks like an address but has an invalid checksum.");
+}
+
+BOOST_AUTO_TEST_CASE(invalid_address_length_long)
+{
+	char const* text = R"(
+		contract C {
+			function f() pure public {
+				address x = 0xFA0bFc97E48458494Ccd857e1A85DC91F7F0046E0;
+				x;
+			}
+		}
+	)";
+	CHECK_WARNING_ALLOW_MULTI(text, "This looks like an address but has an invalid checksum.");
 }
 
 BOOST_AUTO_TEST_CASE(address_test_for_bug_in_implementation)
@@ -5844,7 +5967,7 @@ BOOST_AUTO_TEST_CASE(interface)
 		interface I {
 		}
 	)";
-	success(text);
+	CHECK_SUCCESS(text);
 }
 
 BOOST_AUTO_TEST_CASE(interface_constructor)
@@ -5865,7 +5988,7 @@ BOOST_AUTO_TEST_CASE(interface_functions)
 			function f();
 		}
 	)";
-	success(text);
+	CHECK_SUCCESS(text);
 }
 
 BOOST_AUTO_TEST_CASE(interface_function_bodies)
@@ -5887,12 +6010,18 @@ BOOST_AUTO_TEST_CASE(interface_function_external)
 			function f() external;
 		}
 	)";
-	success(text);
+	CHECK_SUCCESS(text);
 }
 
 BOOST_AUTO_TEST_CASE(interface_function_public)
 {
 	char const* text = R"(
+		interface I {
+			function f() public;
+		}
+	)";
+	CHECK_WARNING(text, "Functions in interfaces should be declared external.");
+	text = R"(
 		pragma experimental "v0.5.0";
 		interface I {
 			function f() public;
@@ -5928,7 +6057,7 @@ BOOST_AUTO_TEST_CASE(interface_events)
 			event E();
 		}
 	)";
-	success(text);
+	CHECK_SUCCESS(text);
 }
 
 BOOST_AUTO_TEST_CASE(interface_inheritance)
@@ -5971,7 +6100,7 @@ BOOST_AUTO_TEST_CASE(interface_function_parameters)
 			function f(uint a) public returns (bool);
 		}
 	)";
-	success(text);
+	CHECK_SUCCESS(text);
 }
 
 BOOST_AUTO_TEST_CASE(interface_enums)
@@ -5995,7 +6124,7 @@ BOOST_AUTO_TEST_CASE(using_interface)
 			}
 		}
 	)";
-	success(text);
+	CHECK_SUCCESS(text);
 }
 
 BOOST_AUTO_TEST_CASE(using_interface_complex)
@@ -6012,7 +6141,7 @@ BOOST_AUTO_TEST_CASE(using_interface_complex)
 			}
 		}
 	)";
-	success(text);
+	CHECK_SUCCESS(text);
 }
 
 BOOST_AUTO_TEST_CASE(warn_about_throw)
@@ -6071,7 +6200,7 @@ BOOST_AUTO_TEST_CASE(pure_statement_check_for_regular_for_loop)
 			}
 		}
 	)";
-	success(text);
+	CHECK_SUCCESS(text);
 }
 
 BOOST_AUTO_TEST_CASE(warn_multiple_storage_storage_copies)
@@ -6187,7 +6316,7 @@ BOOST_AUTO_TEST_CASE(warn_unused_function_parameter)
 			}
 		}
 	)";
-	success(text);
+	CHECK_SUCCESS(text);
 }
 
 BOOST_AUTO_TEST_CASE(warn_unused_return_parameter)
@@ -6236,7 +6365,7 @@ BOOST_AUTO_TEST_CASE(no_unused_warning_interface_arguments)
 {
 	char const* text = R"(
 		interface I {
-			function f(uint a) pure public returns (uint b);
+			function f(uint a) pure external returns (uint b);
 		}
 	)";
 	CHECK_SUCCESS_NO_WARNINGS(text);
@@ -6578,6 +6707,28 @@ BOOST_AUTO_TEST_CASE(warn_unspecified_storage)
 		}
 	)";
 	CHECK_ERROR(text, TypeError, "Storage location must be specified as either \"memory\" or \"storage\".");
+}
+
+BOOST_AUTO_TEST_CASE(storage_location_non_array_or_struct_disallowed)
+{
+	char const* text = R"(
+		contract C {
+			function f(uint storage a) public { }
+		}
+	)";
+	CHECK_ERROR(text, TypeError, "Storage location can only be given for array or struct types.");
+}
+
+BOOST_AUTO_TEST_CASE(storage_location_non_array_or_struct_disallowed_is_not_fatal)
+{
+	char const* text = R"(
+		contract C {
+			function f(uint storage a) public {
+				a = f;
+			}
+		}
+	)";
+	CHECK_ERROR_ALLOW_MULTI(text, TypeError, "Storage location can only be given for array or struct types.");
 }
 
 BOOST_AUTO_TEST_CASE(implicit_conversion_disallowed)
@@ -7214,7 +7365,7 @@ BOOST_AUTO_TEST_CASE(array_length_too_large)
 			uint[8**90] ids;
 		}
 	)";
-	CHECK_ERROR(text, TypeError, "Invalid array length, expected integer literal.");
+	CHECK_ERROR(text, TypeError, "Invalid array length, expected integer literal or constant expression.");
 }
 
 BOOST_AUTO_TEST_CASE(array_length_not_convertible_to_integer)
@@ -7224,7 +7375,152 @@ BOOST_AUTO_TEST_CASE(array_length_not_convertible_to_integer)
 			uint[true] ids;
 		}
 	)";
-	CHECK_ERROR(text, TypeError, "Invalid array length, expected integer literal.");
+	CHECK_ERROR(text, TypeError, "Invalid array length, expected integer literal or constant expression.");
+}
+
+BOOST_AUTO_TEST_CASE(array_length_constant_var)
+{
+	char const* text = R"(
+		contract C {
+			uint constant LEN = 10;
+			uint[LEN] ids;
+		}
+	)";
+	CHECK_SUCCESS(text);
+}
+
+BOOST_AUTO_TEST_CASE(array_length_non_integer_constant_var)
+{
+	char const* text = R"(
+		contract C {
+			bool constant LEN = true;
+			uint[LEN] ids;
+		}
+	)";
+	CHECK_ERROR(text, TypeError, "Invalid array length, expected integer literal or constant expression.");
+}
+
+BOOST_AUTO_TEST_CASE(array_length_cannot_be_function)
+{
+	char const* text = R"(
+		contract C {
+			function f() {}
+			uint[f] ids;
+		}
+	)";
+	CHECK_ERROR(text, TypeError, "Invalid array length, expected integer literal or constant expression.");
+}
+
+BOOST_AUTO_TEST_CASE(array_length_can_be_recursive_constant)
+{
+	char const* text = R"(
+		contract C {
+			uint constant L = 5;
+			uint constant LEN = L + 4 * L;
+			uint[LEN] ids;
+		}
+	)";
+	CHECK_SUCCESS(text);
+}
+
+BOOST_AUTO_TEST_CASE(array_length_cannot_be_function_call)
+{
+	char const* text = R"(
+		contract C {
+			function f(uint x) {}
+			uint constant LEN = f();
+			uint[LEN] ids;
+		}
+	)";
+	CHECK_ERROR(text, TypeError, "Invalid array length, expected integer literal or constant expression.");
+}
+
+BOOST_AUTO_TEST_CASE(array_length_const_cannot_be_fractional)
+{
+	char const* text = R"(
+		contract C {
+			fixed constant L = 10.5;
+			uint[L] ids;
+		}
+	)";
+	CHECK_ERROR(text, TypeError, "Array with fractional length specified");
+}
+
+BOOST_AUTO_TEST_CASE(array_length_can_be_constant_in_struct)
+{
+	char const* text = R"(
+		contract C {
+			uint constant LEN = 10;
+			struct Test {
+				uint[LEN] ids;
+			}
+		}
+	)";
+	CHECK_SUCCESS(text);
+}
+
+BOOST_AUTO_TEST_CASE(array_length_can_be_constant_in_function)
+{
+	char const* text = R"(
+		contract C {
+			uint constant LEN = 10;
+			function f() {
+				uint[LEN] a;
+			}
+		}
+	)";
+	CHECK_SUCCESS(text);
+}
+
+BOOST_AUTO_TEST_CASE(array_length_cannot_be_constant_function_parameter)
+{
+	char const* text = R"(
+		contract C {
+			function f(uint constant LEN) {
+				uint[LEN] a;
+			}
+		}
+	)";
+	CHECK_ERROR(text, TypeError, "Invalid array length, expected integer literal or constant expression.");
+}
+
+BOOST_AUTO_TEST_CASE(array_length_with_cyclic_constant)
+{
+	char const* text = R"(
+		contract C {
+			uint constant LEN = LEN;
+			function f() {
+				uint[LEN] a;
+			}
+		}
+	)";
+	CHECK_ERROR(text, TypeError, "Cyclic constant definition (or maximum recursion depth exhausted).");
+}
+
+BOOST_AUTO_TEST_CASE(array_length_with_complex_cyclic_constant)
+{
+	char const* text = R"(
+		contract C {
+			uint constant L2 = LEN - 10;
+			uint constant L1 = L2 / 10;
+			uint constant LEN = 10 + L1 * 5;
+			function f() {
+				uint[LEN] a;
+			}
+		}
+	)";
+	CHECK_ERROR(text, TypeError, "Cyclic constant definition (or maximum recursion depth exhausted).");
+}
+
+BOOST_AUTO_TEST_CASE(array_length_with_pure_functions)
+{
+	char const* text = R"(
+		contract C {
+			uint constant LEN = keccak256(ripemd160(33));
+			uint[LEN] ids;
+		}
+	)";
+	CHECK_ERROR(text, TypeError, "Invalid array length, expected integer literal or constant expression.");
 }
 
 BOOST_AUTO_TEST_CASE(array_length_invalid_expression)
@@ -7234,25 +7530,31 @@ BOOST_AUTO_TEST_CASE(array_length_invalid_expression)
 			uint[-true] ids;
 		}
 	)";
-	CHECK_ERROR(text, TypeError, "Invalid constant expression.");
+	CHECK_ERROR(text, TypeError, "Invalid array length, expected integer literal or constant expression.");
 	text = R"(
 		contract C {
 			uint[true/1] ids;
 		}
 	)";
-	CHECK_ERROR(text, TypeError, "Invalid constant expression.");
+	CHECK_ERROR(text, TypeError, "Invalid array length, expected integer literal or constant expression.");
 	text = R"(
 		contract C {
 			uint[1/true] ids;
 		}
 	)";
-	CHECK_ERROR(text, TypeError, "Invalid constant expression.");
+	CHECK_ERROR(text, TypeError, "Invalid array length, expected integer literal or constant expression.");
 	text = R"(
 		contract C {
 			uint[1.111111E1111111111111] ids;
 		}
 	)";
-	CHECK_ERROR(text, TypeError, "Invalid literal value.");
+	CHECK_ERROR(text, TypeError, "Invalid array length, expected integer literal or constant expression.");
+	text = R"(
+		contract C {
+			uint[3/0] ids;
+		}
+	)";
+	CHECK_ERROR(text, TypeError, "Operator / not compatible with types int_const 3 and int_const 0");
 }
 
 BOOST_AUTO_TEST_CASE(no_address_members_on_contract)

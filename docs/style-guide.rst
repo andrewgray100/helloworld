@@ -25,7 +25,7 @@ solidity code.  The goal of this guide is *consistency*.  A quote from python's
 captures this concept well.
 
     A style guide is about consistency. Consistency with this style guide is important. Consistency within a project is more important. Consistency within one module or function is most important.
-    But most importantly: know when to be inconsistent -- sometimes the style guide just doesn't apply. When in doubt, use your best judgment. Look at other examples and decide what looks best. And don't hesitate to ask!
+    But most importantly: know when to be inconsistent -- sometimes the style guide just doesn't apply. When in doubt, use your best judgement. Look at other examples and decide what looks best. And don't hesitate to ask!
 
 
 ***********
@@ -86,17 +86,17 @@ Blank lines may be omitted between groups of related one-liners (such as stub fu
 Yes::
 
     contract A {
-        function spam();
-        function ham();
+        function spam() public;
+        function ham() public;
     }
 
 
     contract B is A {
-        function spam() {
+        function spam() public {
             ...
         }
 
-        function ham() {
+        function ham() public {
             ...
         }
     }
@@ -104,10 +104,10 @@ Yes::
 No::
 
     contract A {
-        function spam() {
+        function spam() public {
             ...
         }
-        function ham() {
+        function ham() public {
             ...
         }
     }
@@ -169,26 +169,26 @@ Within a grouping, place the ``constant`` functions last.
 Yes::
 
     contract A {
-        function A() {
+        function A() public {
             ...
         }
-        
-        function() {
+
+        function() public {
             ...
         }
-        
+
         // External functions
         // ...
-        
+
         // External functions that are constant
         // ...
-        
+
         // Public functions
         // ...
-        
+
         // Internal functions
         // ...
-        
+
         // Private functions
         // ...
     }
@@ -196,7 +196,7 @@ Yes::
 No::
 
     contract A {
-        
+
         // External functions
         // ...
 
@@ -206,16 +206,16 @@ No::
         // Public functions
         // ...
 
-        function A() {
+        function A() public {
             ...
         }
-        
-        function() {
+
+        function() public {
             ...
         }
 
         // Internal functions
-        // ...       
+        // ...
     }
 
 Whitespace in Expressions
@@ -223,7 +223,7 @@ Whitespace in Expressions
 
 Avoid extraneous whitespace in the following  situations:
 
-Immediately inside parenthesis, brackets or braces, with the exception of single-line function declarations.
+Immediately inside parenthesis, brackets or braces, with the exception of single line function declarations.
 
 Yes::
 
@@ -235,17 +235,17 @@ No::
 
 Exception::
 
-    function singleLine() { spam(); }
+    function singleLine() public { spam(); }
 
 Immediately before a comma, semicolon:
 
 Yes::
 
-    function spam(uint i, Coin coin);
+    function spam(uint i, Coin coin) public;
 
 No::
 
-    function spam(uint i , Coin coin) ;
+    function spam(uint i , Coin coin) public ;
 
 More than one space around an assignment or other operator to align with
   another:
@@ -266,13 +266,13 @@ Don't include a whitespace in the fallback function:
 
 Yes::
 
-    function() {
+    function() public {
         ...
     }
 
 No::
-   
-    function () {
+
+    function () public {
         ...
     }
 
@@ -395,30 +395,30 @@ The opening brace should be preceeded by a single space.
 
 Yes::
 
-    function increment(uint x) returns (uint) {
+    function increment(uint x) public pure returns (uint) {
         return x + 1;
     }
 
-    function increment(uint x) public onlyowner returns (uint) {
+    function increment(uint x) public pure onlyowner returns (uint) {
         return x + 1;
     }
 
 No::
 
-    function increment(uint x) returns (uint)
+    function increment(uint x) public pure returns (uint)
     {
         return x + 1;
     }
 
-    function increment(uint x) returns (uint){
+    function increment(uint x) public pure returns (uint){
         return x + 1;
     }
 
-    function increment(uint x) returns (uint) {
+    function increment(uint x) public pure returns (uint) {
         return x + 1;
         }
 
-    function increment(uint x) returns (uint) {
+    function increment(uint x) public pure returns (uint) {
         return x + 1;}
 
 The visibility modifiers for a function should come before any custom
@@ -450,14 +450,16 @@ Yes::
         address d,
         address e,
         address f
-    ) {
+    )
+        public
+    {
         doSomething();
     }
 
 No::
 
     function thisFunctionHasLotsOfArguments(address a, address b, address c,
-        address d, address e, address f) {
+        address d, address e, address f) public {
         doSomething();
     }
 
@@ -466,7 +468,7 @@ No::
                                             address c,
                                             address d,
                                             address e,
-                                            address f) {
+                                            address f) public {
         doSomething();
     }
 
@@ -476,12 +478,12 @@ No::
         address c,
         address d,
         address e,
-        address f) {
+        address f) public {
         doSomething();
     }
 
 If a long function declaration has modifiers, then each modifier should be
-dropped to it's own line.
+dropped to its own line.
 
 Yes::
 
@@ -542,6 +544,7 @@ Yes::
             B(param1)
             C(param2, param3)
             D(param4)
+            public
         {
             // do something with param5
         }
@@ -554,6 +557,7 @@ No::
         B(param1)
         C(param2, param3)
         D(param4)
+        public
         {
             // do something with param5
         }
@@ -563,7 +567,8 @@ No::
         function A(uint param1, uint param2, uint param3, uint param4, uint param5)
             B(param1)
             C(param2, param3)
-            D(param4) {
+            D(param4)
+            public {
             // do something with param5
         }
     }
@@ -572,7 +577,7 @@ When declaring short functions with a single statement, it is permissible to do 
 
 Permissible::
 
-    function shortFunction() { doSomething(); }
+    function shortFunction() public { doSomething(); }
 
 These guidelines for function declarations are intended to improve readability.
 Authors should use their best judgement as this guide does not try to cover all
@@ -696,49 +701,63 @@ indistinguishable from the numerals one and zero.
 Contract and Library Names
 ==========================
 
-Contracts and libraries should be named using the CapWords style.
+Contracts and libraries should be named using the CapWords style. Examples: ``SimpleToken``, ``SmartBank``, ``CertificateHashRepository``, ``Player``.
 
 
-Events
-======
+Struct Names
+==========================
 
-Events should be named using the CapWords style.
+Structs should be named using the CapWords style. Examples: ``MyCoin``, ``Position``, ``PositionXY``.
+
+
+Event Names
+===========
+
+Events should be named using the CapWords style. Examples: ``Deposit``, ``Transfer``, ``Approval``, ``BeforeTransfer``, ``AfterTransfer``.
 
 
 Function Names
 ==============
 
-Functions should use mixedCase.
+Functions other than constructors should use mixedCase. Examples: ``getBalance``, ``transfer``, ``verifyOwner``, ``addMember``, ``changeOwner``.
 
 
-Function Arguments
-==================
+Function Argument Names
+=======================
+
+Function arguments should use mixedCase. Examples: ``initialSupply``, ``account``, ``recipientAddress``, ``senderAddress``, ``newOwner``.
 
 When writing library functions that operate on a custom struct, the struct
 should be the first argument and should always be named ``self``.
 
 
-Local and State Variables
-=========================
+Local and State Variable Names
+==============================
 
-Use mixedCase.
+Use mixedCase. Examples: ``totalSupply``, ``remainingSupply``, ``balancesOf``, ``creatorAddress``, ``isPreSale``, ``tokenExchangeRate``.
 
 
 Constants
 =========
 
 Constants should be named with all capital letters with underscores separating
-words.  (for example:``MAX_BLOCKS``)
+words. Examples: ``MAX_BLOCKS``, `TOKEN_NAME`, ``TOKEN_TICKER``, ``CONTRACT_VERSION``.
 
 
-Modifiers
-=========
+Modifier Names
+==============
 
-Use mixedCase.
+Use mixedCase. Examples: ``onlyBy``, ``onlyAfter``, ``onlyDuringThePreSale``.
 
 
-Avoiding Collisions
-===================
+Enums
+=====
+
+Enums, in the style of simple type declarations, should be named using the CapWords style. Examples: ``TokenGroup``, ``Frame``, ``HashStyle``, ``CharacterLocation``.
+
+
+Avoiding Naming Collisions
+==========================
 
 * ``single_trailing_underscore_``
 

@@ -34,7 +34,7 @@ library has to be updated by an external oracle.
 These suffixes cannot be applied to variables. If you want to
 interpret some input variable in e.g. days, you can do it in the following way::
 
-    function f(uint start, uint daysAfter) {
+    function f(uint start, uint daysAfter) public {
         if (now >= start + daysAfter * 1 days) {
           // ...
         }
@@ -83,11 +83,6 @@ Block and Transaction Properties
     The current block timestamp must be strictly larger than the timestamp of the last block,
     but the only guarantee is that it will be somewhere between the timestamps of two
     consecutive blocks in the canonical chain.
-
-.. note::
-    If you want to implement access restrictions in library functions using
-    ``msg.sender``, you have to manually supply the value of
-    ``msg.sender`` as an argument.
 
 .. note::
     The block hashes are not available for all blocks for scalability reasons.

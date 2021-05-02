@@ -1,11 +1,44 @@
-### 0.4.18 (unreleased)
+### 0.4.20 (unreleased)
+
+Features:
+ * Code Generator: Prevent non-view functions in libraries from being called directly.
+ * Commandline interface: Support strict mode of assembly with the ``--strict--assembly`` switch.
+ * Compiler now continues resolving references after the first error.
+ * Limit the number of warnings raised for creating abstract contracts.
+ * Inline Assembly: Issue warning for using jump labels (already existed for jump instructions).
+ * Inline Assembly: Support some restricted tokens (return, byte, address) as identifiers in Julia mode.
+ * SMT Checker: If-else branch conditions are taken into account in the SMT encoding of the program
+   variables.
+ * Type Checker: Issue warning for using ``public`` visibility for interface functions.
+
+Bugfixes:
+ * Parser: Disallow event declarations with no parameter list.
+ * Standard JSON: Populate the ``sourceLocation`` field in the error list.
+ * Standard JSON: Properly support contract and library file names containing a colon (such as URLs).
+ * Type Checker: Suggest the experimental ABI encoder if using ``struct``s as function parameters
+   (instead of an internal compiler error).
+ * Type Checker: Improve error message for wrong struct initialization.
+
+### 0.4.19 (2017-11-30)
+
+Features:
+ * Code Generator: New ABI decoder which supports structs and arbitrarily nested
+   arrays and checks input size (activate using ``pragma experimental ABIEncoderV2;``).
+ * General: Allow constant variables to be used as array length.
+ * Inline Assembly: ``if`` statement.
+ * Standard JSON: Support the ``outputSelection`` field for selective compilation of target artifacts.
+ * Syntax Checker: Turn the usage of ``callcode`` into an error as experimental 0.5.0 feature.
+ * Type Checker: Improve address checksum warning.
+ * Type Checker: More detailed errors for invalid array lengths (such as division by zero).
+
+Bugfixes:
+
+### 0.4.18 (2017-10-18)
 
 Features:
  * Code Generator: Always use all available gas for calls as experimental 0.5.0 feature
-   (previously, some amount was retained in order to work in pre-tangerine whistle
+   (previously, some amount was retained in order to work in pre-Tangerine-Whistle
    EVM versions)
- * Code Generator: Do not accept data with less than four bytes (truncated function
-   signature) for regular function calls - fallback function is invoked instead.
  * Parser: Better error message for unexpected trailing comma in parameter lists.
  * Standard JSON: Support the ``outputSelection`` field for selective compilation of supplied sources.
  * Syntax Checker: Unary ``+`` is now a syntax error as experimental 0.5.0 feature.
@@ -13,17 +46,20 @@ Features:
  * Type Checker: Do not add members of ``address`` to contracts as experimental 0.5.0 feature.
  * Type Checker: Force interface functions to be external as experimental 0.5.0 feature.
  * Type Checker: Require ``storage`` or ``memory`` keyword for local variables as experimental 0.5.0 feature.
+ * Compiler Interface: Better formatted error message for long source snippets
 
 Bugfixes:
  * Code Generator: Allocate one byte per memory byte array element instead of 32.
+ * Code Generator: Do not accept data with less than four bytes (truncated function
+   signature) for regular function calls - fallback function is invoked instead.
  * Optimizer: Remove unused stack computation results.
  * Parser: Fix source location of VariableDeclarationStatement.
+ * Type Checker: Allow ``gas`` in view functions.
+ * Type Checker: Do not mark event parameters as shadowing state variables.
+ * Type Checker: Prevent duplicate event declarations.
  * Type Checker: Properly check array length and don't rely on an assertion in code generation.
  * Type Checker: Properly support overwriting members inherited from ``address`` in a contract
    (such as ``balance``, ``transfer``, etc.)
- * Type Checker: Prevent duplicate event declarations.
- * Type Checker: Do not mark event parameters as shadowing state variables.
- * Type Checker: Allow ``gas`` in view functions.
  * Type Checker: Validate each number literal in tuple expressions even if they are not assigned from.
 
 ### 0.4.17 (2017-09-21)

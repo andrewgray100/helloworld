@@ -393,6 +393,14 @@
         ], 
         "released": "2017-09-21"
     }, 
+    "0.4.18": {
+        "bugs": [], 
+        "released": "2017-10-18"
+    }, 
+    "0.4.19": {
+        "bugs": [], 
+        "released": "2017-11-30"
+    }, 
     "0.4.2": {
         "bugs": [
             "ZeroFunctionSelector", 

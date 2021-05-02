@@ -97,6 +97,7 @@ static string const g_strJulia = "julia";
 static string const g_strLicense = "license";
 static string const g_strLibraries = "libraries";
 static string const g_strLink = "link";
+static string const g_strMachine = "machine";
 static string const g_strMetadata = "metadata";
 static string const g_strMetadataLiteral = "metadata-literal";
 static string const g_strNatspecDev = "devdoc";
@@ -112,6 +113,7 @@ static string const g_strSourceList = "sourceList";
 static string const g_strSrcMap = "srcmap";
 static string const g_strSrcMapRuntime = "srcmap-runtime";
 static string const g_strStandardJSON = "standard-json";
+static string const g_strStrictAssembly = "strict-assembly";
 static string const g_strPrettyJson = "pretty-json";
 static string const g_strVersion = "version";
 
@@ -134,10 +136,10 @@ static string const g_argFormal = g_strFormal;
 static string const g_argGas = g_strGas;
 static string const g_argHelp = g_strHelp;
 static string const g_argInputFile = g_strInputFile;
-static string const g_argJulia = "julia";
+static string const g_argJulia = g_strJulia;
 static string const g_argLibraries = g_strLibraries;
 static string const g_argLink = g_strLink;
-static string const g_argMachine = "machine";
+static string const g_argMachine = g_strMachine;
 static string const g_argMetadata = g_strMetadata;
 static string const g_argMetadataLiteral = g_strMetadataLiteral;
 static string const g_argNatspecDev = g_strNatspecDev;
@@ -148,6 +150,7 @@ static string const g_argOptimizeRuns = g_strOptimizeRuns;
 static string const g_argOutputDir = g_strOutputDir;
 static string const g_argSignatureHashes = g_strSignatureHashes;
 static string const g_argStandardJSON = g_strStandardJSON;
+static string const g_argStrictAssembly = g_strStrictAssembly;
 static string const g_argVersion = g_strVersion;
 static string const g_stdinFileName = g_stdinFileNameStr;
 
@@ -424,20 +427,13 @@ void CommandLineInterface::readInputFilesAndConfigureRemappings()
 					continue;
 				}
 
-				m_sourceCodes[infile.string()] = dev::contentsString(infile.string());
+				m_sourceCodes[infile.string()] = dev::readFileAsString(infile.string());
 				path = boost::filesystem::canonical(infile).string();
 			}
 			m_allowedDirectories.push_back(boost::filesystem::path(path).remove_filename());
 		}
 	if (addStdin)
-	{
-		string s;
-		while (!cin.eof())
-		{
-			getline(cin, s);
-			m_sourceCodes[g_stdinFileName].append(s + '\n');
-		}
-	}
+		m_sourceCodes[g_stdinFileName] = dev::readStandardInput();
 }
 
 bool CommandLineInterface::parseLibraryOption(string const& _input)
@@ -447,7 +443,7 @@ bool CommandLineInterface::parseLibraryOption(string const& _input)
 	try
 	{
 		if (fs::is_regular_file(_input))
-			data = contentsString(_input);
+			data = readFileAsString(_input);
 	}
 	catch (fs::filesystem_error const&)
 	{
@@ -582,6 +578,10 @@ Allowed options)",
 			"Switch to JULIA mode, ignoring all options except --machine and assumes input is JULIA."
 		)
 		(
+			g_argStrictAssembly.c_str(),
+			"Switch to strict assembly mode, ignoring all options except --machine and assumes input is strict assembly."
+		)
+		(
 			g_argMachine.c_str(),
 			po::value<string>()->value_name(boost::join(g_machineArgs, ",")),
 			"Target machine in assembly or JULIA mode."
@@ -698,7 +698,7 @@ bool CommandLineInterface::processInput()
 				return ReadCallback::Result{false, "Not a valid file."};
 			else
 			{
-				auto contents = dev::contentsString(canonicalPath.string());
+				auto contents = dev::readFileAsString(canonicalPath.string());
 				m_sourceCodes[path.string()] = contents;
 				return ReadCallback::Result{true, contents};
 			}
@@ -731,13 +731,7 @@ bool CommandLineInterface::processInput()
 
 	if (m_args.count(g_argStandardJSON))
 	{
-		string input;
-		while (!cin.eof())
-		{
-			string tmp;
-			getline(cin, tmp);
-			input.append(tmp + "\n");
-		}
+		string input = dev::readStandardInput();
 		StandardCompiler compiler(fileReader);
 		cout << compiler.compile(input) << endl;
 		return true;
@@ -750,13 +744,13 @@ bool CommandLineInterface::processInput()
 			if (!parseLibraryOption(library))
 				return false;
 
-	if (m_args.count(g_argAssemble) || m_args.count(g_argJulia))
+	if (m_args.count(g_argAssemble) || m_args.count(g_argStrictAssembly) || m_args.count(g_argJulia))
 	{
 		// switch to assembly mode
 		m_onlyAssemble = true;
 		using Input = AssemblyStack::Language;
 		using Machine = AssemblyStack::Machine;
-		Input inputLanguage = m_args.count(g_argJulia) ? Input::JULIA : Input::Assembly;
+		Input inputLanguage = m_args.count(g_argJulia) ? Input::JULIA : (m_args.count(g_argStrictAssembly) ? Input::StrictAssembly : Input::Assembly);
 		Machine targetMachine = Machine::EVM;
 		if (m_args.count(g_argMachine))
 		{
@@ -951,9 +945,10 @@ void CommandLineInterface::handleAst(string const& _argStr)
 		for (auto const& sourceCode: m_sourceCodes)
 			asts.push_back(&m_compiler->ast(sourceCode.first));
 		map<ASTNode const*, eth::GasMeter::GasConsumption> gasCosts;
-		if (m_compiler->runtimeAssemblyItems())
+		// FIXME: shouldn't this be done for every contract?
+		if (m_compiler->runtimeAssemblyItems(m_compiler->lastContractName()))
 			gasCosts = GasEstimator::breakToStatementLevel(
-				GasEstimator::structuralEstimation(*m_compiler->runtimeAssemblyItems(), asts),
+				GasEstimator::structuralEstimation(*m_compiler->runtimeAssemblyItems(m_compiler->lastContractName()), asts),
 				asts
 			);
 

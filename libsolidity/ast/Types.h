@@ -257,7 +257,7 @@ public:
 	}
 	virtual u256 literalValue(Literal const*) const
 	{
-		solAssert(false, "Literal value requested for type without literals.");
+		solAssert(false, "Literal value requested for type without literals: " + toString(false));
 	}
 
 	/// @returns a (simpler) type that is encoded in the same way for external function calls.
@@ -706,10 +706,6 @@ public:
 
 	/// Returns the function type of the constructor modified to return an object of the contract's type.
 	FunctionTypePointer const& newExpressionType() const;
-
-	/// @returns the identifier of the function with the given name or Invalid256 if such a name does
-	/// not exist.
-	u256 functionIdentifier(std::string const& _functionName) const;
 
 	/// @returns a list of all state variables (including inherited) of the contract and their
 	/// offsets in storage.

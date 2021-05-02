@@ -52,11 +52,11 @@ bool parse(string const& _source, ErrorReporter& errorReporter)
 	try
 	{
 		auto scanner = make_shared<Scanner>(CharStream(_source));
-		auto parserResult = assembly::Parser(errorReporter, true).parse(scanner);
+		auto parserResult = assembly::Parser(errorReporter, assembly::AsmFlavour::IULIA).parse(scanner);
 		if (parserResult)
 		{
 			assembly::AsmAnalysisInfo analysisInfo;
-			return (assembly::AsmAnalyzer(analysisInfo, errorReporter, true)).analyze(*parserResult);
+			return (assembly::AsmAnalyzer(analysisInfo, errorReporter, assembly::AsmFlavour::IULIA)).analyze(*parserResult);
 		}
 	}
 	catch (FatalError const&)
@@ -196,6 +196,14 @@ BOOST_AUTO_TEST_CASE(empty_call)
 	CHECK_ERROR("{ () }", ParserError, "Literal or identifier expected.");
 }
 
+BOOST_AUTO_TEST_CASE(tokens_as_identifers)
+{
+	BOOST_CHECK(successParse("{ let return:u256 := 1:u256 }"));
+	BOOST_CHECK(successParse("{ let byte:u256 := 1:u256 }"));
+	BOOST_CHECK(successParse("{ let address:u256 := 1:u256 }"));
+	BOOST_CHECK(successParse("{ let bool:u256 := 1:u256 }"));
+}
+
 BOOST_AUTO_TEST_CASE(lacking_types)
 {
 	CHECK_ERROR("{ let x := 1:u256 }", ParserError, "Expected token Identifier got 'Assign'");
@@ -267,6 +275,21 @@ BOOST_AUTO_TEST_CASE(multiple_assignment)
 	}
 	)";
 	BOOST_CHECK(successParse(text));
+}
+
+BOOST_AUTO_TEST_CASE(if_statement)
+{
+	BOOST_CHECK(successParse("{ if true:bool {} }"));
+	BOOST_CHECK(successParse("{ if false:bool { let x:u256 := 3:u256 } }"));
+	BOOST_CHECK(successParse("{ function f() -> x:bool {} if f() { let b:bool := f() } }"));
+}
+
+BOOST_AUTO_TEST_CASE(if_statement_invalid)
+{
+	CHECK_ERROR("{ if let x:u256 {} }", ParserError, "Literal or identifier expected.");
+	CHECK_ERROR("{ if true:bool let x:u256 := 3:u256 }", ParserError, "Expected token LBrace");
+	// TODO change this to an error once we check types.
+	BOOST_CHECK(successParse("{ if 42:u256 { } }"));
 }
 
 BOOST_AUTO_TEST_SUITE_END()
